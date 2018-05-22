@@ -53,14 +53,15 @@ class DecoderRNN(nn.Module):
         max_len = 10
         count = 0
 
-        while count < max_len:
-            if pred is None:
-                lstm_out, (h_n, c_n) = self.lstm(inputs)
-            else:
-                embeddings = self.embed(pred)
-                lstm_out, (h_n, c_n) = self.lstm(embeddings, (h_n, c_n))
+        states = None
 
-            pred = self.linear(lstm_out).max(2)
+        while count < max_len:
+            hidden, states = self.lstm(inputs, states)
+            output = self.linear(hidden)
+            _, pred = output.max(2)
+            inputs = self.embed(pred)
+            print(pred.shape)
+            print(inputs.shape)
 
             preds.append(pred.item())
             count += 1
