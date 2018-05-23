@@ -23,13 +23,14 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
         self.embed = nn.Embedding(vocab_size, embed_size)
         self.lstm = nn.LSTM(embed_size, hidden_size, 1, batch_first=True)
+        self.softmax = nn.Softmax()
 
         self.linear = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, features, captions):
-        #print("Captions      ======", captions.shape)
-        embeddings = self.embed(captions)
-        #print("Embeddings    ======", embeddings.shape)
+        # print("Captions      ======", captions.shape)
+        embeddings = self.embed(captions[:, :-1])
+        # print("Embeddings    ======", embeddings.shape)
 
         features = features.unsqueeze(1)
         #print("Features      ======", features.shape)
@@ -41,30 +42,39 @@ class DecoderRNN(nn.Module):
 
         output = self.linear(lstm_out)
 
-        output = output[:, 1:, :].contiguous() # do not return CNN output (<start> word)
+        # output = output[:, 1:, :].contiguous() # do not return CNN output (<start> word)
 
         return output
 
     def sample(self, inputs):
+        " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len) "
+
         # input should be (1, 1, embed_size)
-
         preds = []
-        pred = None
-        max_len = 10
+        prediction = None
+        max_len = 20
         count = 0
-
         states = None
+        embeddings = inputs
 
-        while count < max_len:
-            hidden, states = self.lstm(inputs, states)
-            output = self.linear(hidden)
-            _, pred = output.max(2)
-            inputs = self.embed(pred)
-            print(pred.shape)
-            print(inputs.shape)
+        while count < max_len and prediction != 1:
+            #print("embedding shape ============", embeddings.shape)
+            #print(embeddings)
+            lstm_out, states = self.lstm(embeddings, states)
+            output = self.linear(lstm_out)
 
-            preds.append(pred.item())
+            #print("output =====================", output.shape)
+            # output = output[:, -1:, :]
+
+            max_p, pred = output.max(2)
+
+            #print("prediction =================", max_p.data[0].tolist())
+            #print("index ======================", pred.data[0].tolist())
+            #print("\n")
+            prediction = pred.item()
+            preds.append(prediction)
+            embeddings = self.embed(pred)
+
             count += 1
 
-        " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len) "
         return preds
